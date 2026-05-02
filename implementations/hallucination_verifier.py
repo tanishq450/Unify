@@ -663,80 +663,200 @@ class FinGroundVerifier:
 
         return 0.5  # Default
 
-    # Placeholder methods - implement based on your needs
     def _infer_formula(self, text: str) -> Optional[str]:
-        """Infer formula from computational claim"""
-        # Implement based on your domain
-        return None
-
-    def _find_formula_components(self, formula: str, context: List[str]) -> Optional[Dict]:
-        """Find values for formula components in context"""
-        # Implement based on your domain
-        return None
-
-    def _evaluate_formula(self, formula: str, components: Dict) -> float:
-        """Evaluate formula with given components"""
-        # Implement based on your domain
-        return 0.0
-
-    def _verify_comparative_directional(self, claim: AtomicClaim, context: List[str]) -> AtomicClaim:
-        """Verify directional comparison (increased/decreased)"""
-        # Implement directional verification
-        claim.verified = False
-        return claim
-
-    def _find_comparative_values(self, text: str, context: List[str]) -> Optional[List[float]]:
-        """Find values being compared"""
-        # Implement
-        return None
-
-    def _dates_match(self, date1: str, text: str) -> bool:
-        """Check if date matches date in text"""
-        return date1 in text
-
-
-# Import numpy at module level
-import numpy as np
-
-
-# Example usage
-if __name__ == "__main__":
-    # Mock LLM client for testing
-    class MockLLM:
-        def generate(self, prompt: str) -> str:
-            return "Mock response"
-
-    # Initialize verifier
-    verifier = FinGroundVerifier(llm_client=MockLLM())
-
-    # Test claim decomposition
-    answer = """
-    Apple's revenue was $383.29 billion in fiscal year 2024, up 2% year-over-year.
-    Gross margin was 44.1% compared to 44.9% in the prior year.
-    The company is subject to SEC Rule 10-K reporting requirements.
+      """
+     Infer common finance formulas from text.
     """
 
-    claims = verifier.decompose(answer)
+    text = text.lower()
 
-    print(f"Decomposed into {len(claims)} claims:\n")
-    for i, claim in enumerate(claims):
-        print(f"{i+1}. [{claim.claim_type.value}] {claim.text}")
-        print(f"   Numbers: {claim.has_numbers}, Dates: {claim.has_dates}")
-        print()
+    formula_patterns = {
+        "gross margin": "(revenue-cogs)/revenue",
+        "operating margin": "operating_income/revenue",
+        "net margin": "net_income/revenue",
+        "profit margin": "net_income/revenue",
+        "eps": "net_income/shares_outstanding",
+        "debt ratio": "total_debt/total_assets",
+        "current ratio": "current_assets/current_liabilities",
+    }
 
-    # Test verification
-    context = [
-        "Apple Inc. reported revenue of $383.29 billion for fiscal year 2024.",
-        "Gross margin was 44.1% compared to 44.9% in fiscal 2023.",
-        "As a public company, Apple files annual 10-K reports with the SEC."
-    ]
+    for keyword, formula in formula_patterns.items():
+        if keyword in text:
+            return formula
 
-    verified_claims = verifier.verify(claims, context)
+    return None
 
-    print("\nVerification results:\n")
-    for claim in verified_claims:
-        status = "✓" if claim.verified else "✗"
-        print(f"{status} {claim.text}")
-        print(f"  Method: {claim.verification_method}")
-        print(f"  Evidence: {claim.supporting_evidence}")
-        print()
+
+    def _find_formula_components(
+    self,
+    formula: str,
+    context: List[str]
+) -> Optional[Dict]:
+     """
+    Extract variables required by formula from context.
+     """
+
+    variables = set(re.findall(r"[a-zA-Z_]+", formula))
+    components = {}
+
+    for var in variables:
+        pattern = rf"{var.replace('_', ' ')}.*?([$€£]?\d+[.,]?\d*[BbMmKk]?)"
+
+        for ctx in context:
+            match = re.search(pattern, ctx, re.I)
+            if match:
+                value = self._extract_primary_number(match.group(1))
+                if value is not None:
+                    components[var] = value
+                    break
+
+    return components if components else None
+
+
+    def _evaluate_formula(
+        self,
+        formula: str,
+        components: Dict
+    ) -> float:
+        """
+        Safely evaluate formula.
+        """
+
+        safe_formula = formula
+
+        for key, value in components.items():
+            safe_formula = safe_formula.replace(key, str(value))
+
+        allowed_chars = set(
+            "0123456789.+-*/() "
+        )
+
+        if not all(c in allowed_chars for c in safe_formula):
+            raise ValueError("Unsafe formula")
+
+        return float(eval(safe_formula))
+
+
+    def _verify_comparative_directional(
+        self,
+        claim: AtomicClaim,
+        context: List[str]
+    ) -> AtomicClaim:
+        """
+        Verify directional changes like increased/decreased.
+        """
+
+        values = self._find_comparative_values(claim.text, context)
+
+        if not values or len(values) < 2:
+            claim.verified = False
+            claim.verification_method = "directional_not_found"
+            claim.supporting_evidence = "Not enough values"
+            return claim
+
+        direction = None
+        text = claim.text.lower()
+
+        if "increase" in text or "grew" in text:
+            direction = "up"
+        elif "decrease" in text or "declined" in text:
+            direction = "down"
+
+        actual_direction = "up" if values[1] > values[0] else "down"
+
+        if direction == actual_direction:
+            claim.verified = True
+            claim.verification_method = "directional_verified"
+            claim.supporting_evidence = f"{values[0]} -> {values[1]}"
+            claim.confidence_after_verification = 0.8
+        else:
+            claim.verified = False
+            claim.verification_method = "directional_mismatch"
+            claim.supporting_evidence = f"{values[0]} -> {values[1]}"
+
+        return claim
+
+
+    def _find_comparative_values(
+        self,
+        text: str,
+        context: List[str]
+    ) -> Optional[List[float]]:
+        """
+        Find numbers that likely form a comparison.
+        """
+
+        values = []
+
+        for ctx in context:
+            nums = self._extract_all_numbers_with_context(ctx)
+
+            for num, _ in nums:
+                values.append(num)
+
+        if len(values) >= 2:
+            return values[:2]
+
+        return None
+
+
+        def _extract_numbers(
+        self,
+        text: str
+    ) -> List[str]:
+         """
+        Extract all raw numeric strings from text.
+        """
+
+        return re.findall(
+            r'[$€£]?\d+[.,]?\d*[BbMmKk]?',
+            text
+        )
+
+
+
+    # Import numpy at module level
+    import numpy as np
+
+
+    # Example usage
+    if __name__ == "__main__":
+        # Mock LLM client for testing
+        class MockLLM:
+            def generate(self, prompt: str) -> str:
+                return "Mock response"
+
+        # Initialize verifier
+        verifier = FinGroundVerifier(llm_client=MockLLM())
+
+        # Test claim decomposition
+        answer = """
+        Apple's revenue was $383.29 billion in fiscal year 2024, up 2% year-over-year.
+        Gross margin was 44.1% compared to 44.9% in the prior year.
+        The company is subject to SEC Rule 10-K reporting requirements.
+        """
+
+        claims = verifier.decompose(answer)
+
+        print(f"Decomposed into {len(claims)} claims:\n")
+        for i, claim in enumerate(claims):
+            print(f"{i+1}. [{claim.claim_type.value}] {claim.text}")
+            print(f"   Numbers: {claim.has_numbers}, Dates: {claim.has_dates}")
+            print()
+
+        # Test verification
+        context = [
+            "Apple Inc. reported revenue of $383.29 billion for fiscal year 2024.",
+            "Gross margin was 44.1% compared to 44.9% in fiscal 2023.",
+            "As a public company, Apple files annual 10-K reports with the SEC."
+        ]
+
+        verified_claims = verifier.verify(claims, context)
+
+        print("\nVerification results:\n")
+        for claim in verified_claims:
+            status = "✓" if claim.verified else "✗"
+            print(f"{status} {claim.text}")
+            print(f"  Method: {claim.verification_method}")
+            print(f"  Evidence: {claim.supporting_evidence}")
+            print()
