@@ -18,8 +18,9 @@ from unittest.mock import MagicMock
 def _stub(name: str, attrs: dict = None):
     """Register a fake module (and its parent chain) in sys.modules.
 
-    Does NOT override modules that already exist in sys.modules (e.g. real
-    packages discovered on disk) unless `attrs` is supplied for the leaf.
+    Creates stub entries for any part of the dotted name that is not already
+    present in sys.modules.  If `attrs` is provided, those attributes are set
+    on the leaf module (overwriting any existing attributes with the same name).
     """
     parts = name.split(".")
     for i in range(1, len(parts) + 1):
