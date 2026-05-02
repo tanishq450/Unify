@@ -1,0 +1,37 @@
+---
+id: 1aaad7f0-1662-478b-aa4d-4f7d5eb5d14b
+---
+graph TD
+    %% Define Nodes
+    User([User Query])
+    Router[s12]
+    
+    %% Retrieval Strategies
+    TableRAG["Table-Aware RAG <br/> (multimodal_table_extractor.py)"]
+    SimpleRAG["Simple RAG <br/> (hybrid_retriever.py)"]
+    GraphRAG["Graph RAG <br/> (graph_rag.py)"]
+    
+    %% Context & Generation
+    ContextFusion((Context Merging))
+    LLM_Draft["LLM Generator <br/> (Initial Draft)"]
+    
+    %% Verification
+    Verifier[s13]
+    FinalOutput([Final Verified Answer])
+
+    %% Edges
+    User -->|010| Router
+    
+    Router -->|011| TableRAG
+    Router -->|012| SimpleRAG
+    Router -->|013| GraphRAG
+    
+    TableRAG -->|014| ContextFusion
+    SimpleRAG -->|015| ContextFusion
+    GraphRAG -->|016| ContextFusion
+    
+    ContextFusion --> LLM_Draft
+    LLM_Draft -->|017| Verifier
+    ContextFusion -.->|018| Verifier
+    
+    Verifier -->|019| FinalOutput

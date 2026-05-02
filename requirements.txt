@@ -1,0 +1,37 @@
+# ── LlamaIndex Core ──────────────────────────────────────────────────
+llama-index-core
+llama-index-llms-openai
+llama-index-embeddings-openai
+llama-index-readers-file
+llama-index-vector-stores-qdrant
+
+# ── LangChain (Graph RAG) ───────────────────────────────────────────
+langchain-openai
+langchain-core
+langchain-neo4j
+langchain-experimental
+
+# ── Retrieval & Embeddings ──────────────────────────────────────────
+sentence-transformers
+qdrant-client
+fastembed
+numpy
+tqdm
+
+# ── Document Parsing & OCR ──────────────────────────────────────────
+pdfplumber
+PyMuPDF
+Pillow
+llama-parse
+chonkie
+
+# ── LLM APIs ────────────────────────────────────────────────────────
+openai
+anthropic
+
+# ── Data Validation & Structuring ───────────────────────────────────
+pydantic
+pandas
+
+# ── Logging ─────────────────────────────────────────────────────────
+loguru
