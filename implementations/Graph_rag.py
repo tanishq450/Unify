@@ -24,7 +24,7 @@ class GRAPH_RAG:
             self.graph = Neo4jGraph(
                 url=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
                 username=os.environ.get("NEO4J_USERNAME", "neo4j"),
-                password=os.environ.get("NEO4J_PASSWORD", "password"),
+                password=os.environ.get("NEO4J_PASSWORD", "Tanishq(@)10"),
                 enhanced_schema=True,   # Richer schema for Cypher generation
                 sanitize=True,          # Clean unsafe characters
                 refresh_schema=True,    # Always fetch latest schema 

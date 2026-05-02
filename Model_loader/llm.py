@@ -1,6 +1,7 @@
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core import Settings
+from llama_index.embeddings.ollama import OllamaEmbedding
 import os
 
 # ── Defaults (override via environment variables) ──────────────────────
@@ -21,11 +22,10 @@ class ModelLoader:
             api_base=MESH_API_BASE,
             api_key=MESH_API_KEY,
         )
-        self.embed_model = OpenAIEmbedding(
-            model="",
-            api_base=MESH_API_BASE,
-            api_key=MESH_API_KEY,
+        self.embed_model = OllamaEmbedding(
+                model_name="qwen3-embedding:4b"
         )
+        
 
     def set_settings(self):
         """Push loaded models into LlamaIndex global Settings."""

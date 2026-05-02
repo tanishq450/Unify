@@ -1,8 +1,13 @@
 # 🏦 Unify — Intelligent Finance RAG
 
-> A multi-strategy Retrieval-Augmented Generation system for financial documents with built-in hallucination prevention.
+> **The ultimate guardrail for financial intelligence.** A multi-strategy Retrieval-Augmented Generation system designed to eliminate hallucinations in financial document analysis.
 
-Unify routes financial queries to the optimal retrieval engine — hybrid vector search, knowledge graphs, or table extraction — then verifies every claim in the generated answer before returning it to the user.
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Qdrant](https://img.shields.io/badge/Qdrant-0033AD?style=for-the-badge&logo=qdrant)](https://qdrant.tech/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=for-the-badge&logo=neo4j)](https://neo4j.com/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
+
+Unify is not just another RAG pipeline. It's a production-grade orchestrator that routes financial queries to specialized retrieval engines—hybrid vector search, knowledge graphs, or multimodal table extraction—and subjects every LLM-generated claim to rigorous atomic verification before it reaches the user.
 
 ---
 
@@ -10,256 +15,146 @@ Unify routes financial queries to the optimal retrieval engine — hybrid vector
 
 | Feature | Description |
 |---|---|
-| **🧠 Intent-Based Routing** | Classifies queries into 6 categories and routes to the optimal RAG strategy |
-| **🔍 Hybrid Retrieval** | BM25 keyword + dense semantic search with Qdrant RRF fusion |
-| **📊 Table-Aware RAG** | Extracts and retrieves structured tables from financial PDFs |
-| **🕸️ Graph RAG** | Neo4j knowledge graph for entity relationships and multi-hop reasoning |
-| **🔄 Cross-Encoder Reranking** | Precision reranking with `bge-reranker-v2-m3` |
-| **🎯 MMR Diversity** | Maximum Marginal Relevance prevents redundant results |
-| **✅ Hallucination Verification** | FinGround-inspired atomic claim decomposition and verification |
+| **🧠 Intent-Based Routing** | Dynamically classifies queries into 6 categories (Trend, Numerical, Relationship, etc.) to select the optimal RAG strategy. |
+| **🔍 Hybrid Retrieval** | Combines BM25 keyword search with dense semantic search using Qdrant RRF fusion for maximum recall. |
+| **📊 Table-Aware RAG** | Preserves structural integrity of financial tables using LlamaParse and GPT-4V, preventing "row-blindness" in LLMs. |
+| **🕸️ Graph RAG** | Leverages Neo4j knowledge graphs for complex multi-hop reasoning (e.g., "How do supplier disruptions affect Apple's Q3 margin?"). |
+| **✅ Hallucination Guardrails** | **FinGround**-inspired verifier decomposes answers into atomic claims and cross-references them against source context. |
+| **🎯 Advanced Reranking** | Uses `bge-reranker-v2-m3` cross-encoders and MMR (Maximum Marginal Relevance) to ensure precision and diversity. |
 
 ---
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TD
+    User([User Query]) --> Router{Intent Classifier}
+    
+    Router -->|General| SimpleRAG[Hybrid Vector Search]
+    Router -->|Numerical/Table| TableRAG[Multimodal Table RAG]
+    Router -->|Relationship| GraphRAG[Neo4j Knowledge Graph]
+    
+    SimpleRAG --> Fusion((Context Fusion))
+    TableRAG --> Fusion
+    GraphRAG --> Fusion
+    
+    Fusion --> LLM[LLM Generator]
+    LLM --> Draft[Draft Answer]
+    
+    Draft --> Verifier{FinGround Verifier}
+    Fusion -.->|Ground Truth| Verifier
+    
+    Verifier -->|Verified| Final([Verified Final Answer])
+    Verifier -->|Failed| LLM
 ```
-User Query
-    │
-    ▼
-┌──────────────────────────┐
-│   Intent Classifier       │  6 intents → 3 strategies
-│   (Rule-based + Adaptive) │
-└──────────┬───────────────┘
-           │
-    ┌──────┼──────────┐
-    ▼      ▼          ▼
-┌───────┐ ┌────────┐ ┌──────────┐
-│Simple │ │ Graph  │ │  Table   │
-│  RAG  │ │  RAG   │ │   RAG    │
-│       │ │        │ │          │
-│Qdrant │ │ Neo4j  │ │pdfplumber│
-│Hybrid │ │ Cypher │ │LlamaParse│
-│Search │ │   QA   │ │ GPT-4V   │
-└───┬───┘ └───┬────┘ └────┬─────┘
-    └─────────┴────────────┘
-              │
-              ▼
-    ┌──────────────────┐
-    │  LLM Generation   │  Draft answer from context
-    └────────┬─────────┘
-             ▼
-    ┌──────────────────┐
-    │  FinGround        │  Decompose → Verify → Regenerate
-    │  Verifier         │  (strips unverified claims)
-    └────────┬─────────┘
-             ▼
-      Verified Answer
-      + Confidence Score
-      + Claim Audit Trail
-```
-
-### Query Routing Strategy
-
-| Intent | Example Query | RAG Strategy |
-|---|---|---|
-| `GENERAL_KNOWLEDGE` | "What does Apple do?" | Simple RAG |
-| `NUMERICAL_TABLE` | "Show iPhone revenue by quarter" | Multimodal RAG |
-| `COMPARISON` | "Apple vs Microsoft market cap" | Multimodal RAG |
-| `TREND` | "Revenue growth trend 2024" | Multimodal RAG |
-| `RELATIONSHIP` | "Who are Apple's suppliers?" | Graph RAG |
-| `ENTITY` | "Who is Apple's CEO?" | Graph RAG |
 
 ---
 
 ## 📁 Project Structure
 
-```
-Hackathon_Project/
-├── main.py                          # CLI entry point & orchestrator
-├── requirements.txt                 # Python dependencies
-├── .env.example                     # Environment variable template
-│
-├── Model_loader/
-│   ├── llm.py                       # LLM & embedding model loader (MeshAPI)
-│   └── embedding_model.py           # Raw OpenAI client for verifier
-│
-├── implementations/
-│   ├── intent_classifier.py         # 6-category query router
-│   ├── Rag.py                       # Hybrid RAG pipeline (ingest + query)
-│   ├── hybrid_retriever.py          # Search engine: reranking + MMR
-│   ├── Graph_rag.py                 # Neo4j knowledge graph RAG
-│   ├── hallucination_verifier.py    # FinGround claim verification
-│   └── multimodal_table_extractor.py # PDF table extraction (3 methods)
-│
-├── qdrant/
-│   └── qdrant.py                    # Async Qdrant client wrapper
-│
-├── utils/
-│   └── Data_ingestion.py            # PDF loading, chunking, unified ingest
-│
-└── docs/
-    ├── ARCHITECTURE.md              # Deep-dive architecture guide
-    ├── UNIFIED_ARCHITECTURE.md      # Unified system design
-    └── mainarchitecture.md          # Orchestrator flow diagram
+```text
+.
+├── api.py                   # FastAPI Server (Production Entrypoint)
+├── main.py                  # CLI Orchestrator & REPL
+├── evaluation.py            # Comprehensive Evaluation Suite
+├── Model_loader/            # LLM & Embedding Model initializers
+├── implementations/         # Core Logic
+│   ├── intent_classifier.py # Query Routing Logic
+│   ├── Rag.py               # Standard Hybrid RAG
+│   ├── Graph_rag.py         # Knowledge Graph Implementation
+│   ├── hallucination_verifier.py # FinGround verification logic
+│   └── multimodal_table_extractor.py # PDF Table parsing
+├── qdrant/                  # Vector DB wrappers
+└── utils/                   # Data Ingestion & PDF Processing
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-- Python 3.10+
-- [Qdrant](https://qdrant.tech/documentation/quick-start/) running on `localhost:6333`
-- [Neo4j](https://neo4j.com/download/) running on `localhost:7687` (optional, for Graph RAG)
-
-### 1. Clone & Install
+### 1. Installation
 
 ```bash
 git clone https://github.com/tanishq450/Unify.git
 cd Unify
-
-python3 -m venv .venv
-source .venv/bin/activate
-
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Environment Setup
 
+Create a `.env` file from the example:
 ```bash
 cp .env.example .env
 ```
+Key variables required: `MESH_API_KEY`, `QDRANT_URL`, and (optional) `NEO4J_URI`.
 
-Edit `.env` with your credentials:
+### 3. Running the System
 
-```env
-# LLM API (OpenAI-compatible endpoint)
-MESH_API_BASE=https://api.meshapi.ai/v1
-MESH_API_KEY=your-api-key-here
-
-# Qdrant vector database
-QDRANT_URL=http://localhost:6333
-
-# Neo4j (optional — Graph RAG)
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-password
-```
-
-### 3. Start Services
-
+#### **Option A: Web API (Recommended)**
+Start the FastAPI server for production-like access:
 ```bash
-# Start Qdrant (Docker)
-docker run -p 6333:6333 qdrant/qdrant
-
-# Start Neo4j (Docker, optional)
-docker run -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/password \
-  neo4j:latest
+python3 api.py
 ```
+Access interactive docs at `http://localhost:8000/docs`.
 
-### 4. Run
-
+#### **Option B: Interactive CLI**
+Chat directly with your documents:
 ```bash
-# Ingest a PDF
-python3 main.py ingest path/to/financial_report.pdf my_collection
-
-# Query
-python3 main.py query "What was Apple's revenue in 2024?" my_collection
-
-# Interactive REPL
 python3 main.py interactive my_collection
 ```
 
----
-
-## 💡 Usage Examples
-
-### Interactive Mode
-
-```
-🏦 Finance RAG — Interactive Mode
-Type 'quit' to exit, 'ingest <path>' to add a PDF.
-
-You > What was the gross margin breakdown by segment?
-
-======================================================================
-  Intent:    numerical_table
-  Strategy:  multimodal_rag
-  Reasoning: Numerical/table query detected (gross margin, breakdown, segment)
-======================================================================
-
-📝 Draft Answer:
-Based on the financial data, gross margin was 44.1% for FY2024...
-
-----------------------------------------------------------------------
-✅ Verified Answer (confidence: 0.92):
-Based on the financial data, gross margin was 44.1% for FY2024...
-
-----------------------------------------------------------------------
-🔍 Claim Verification:
-  ✓ [numerical] Gross margin was 44.1%
-    └─ Exact match: 44.1 in context
-  ✓ [temporal] In fiscal year 2024
-    └─ Date verified in context
-======================================================================
+#### **Option C: Evaluation**
+Run the full benchmark suite to verify accuracy:
+```bash
+python3 evaluation.py --component all --verbose
 ```
 
 ---
 
-## 🔧 Component Details
+## 🛠️ API Reference
 
-### Hybrid Retriever
+| Endpoint | Method | Description |
+|---|---|---|
+| `/ingest` | `POST` | Upload and process a PDF into the vector/graph store. |
+| `/query` | `POST` | Execute a multi-strategy query with hallucination check. |
+| `/evaluate` | `POST` | Trigger background evaluation of system components. |
 
-The search engine combines two retrieval methods for maximum recall and precision:
-
+**Sample Query Request:**
+```json
+{
+  "query": "What was Apple's R&D spend in 2024 vs 2023?",
+  "collection_name": "apple_10k"
+}
 ```
-Query → Dense Embedding (text-embedding-3-small)
-      → Sparse Embedding (BM25 via fastembed)
-      → Qdrant RRF Fusion (k=20 candidates)
-      → Cross-Encoder Reranking (bge-reranker-v2-m3 → top 5)
-      → MMR Diversity Filtering (λ=0.7)
-      → Final Results
-```
-
-### Hallucination Verifier
-
-Every LLM-generated answer goes through a 3-stage verification pipeline:
-
-1. **Decompose** — Break answer into atomic claims (numerical, temporal, comparative, etc.)
-2. **Verify** — Route each claim to a type-specific verifier:
-   - **Numerical**: exact/fuzzy number matching against context (±1% exact, ±5% fuzzy)
-   - **Comparative**: recalculate growth percentages from base values
-   - **Temporal**: validate dates/periods exist in source documents
-   - **Computational**: recompute formulas (e.g., gross margin = (rev - cogs) / rev)
-3. **Regenerate** — Produce final answer using *only* verified claims
-
-### Table Extraction (3 methods, cascading fallback)
-
-| Method | Accuracy | Cost | Use Case |
-|---|---|---|---|
-| LlamaParse | ~90% | $0.003/page | Production (best quality) |
-| pdfplumber | ~75% | Free | Local/offline |
-| GPT-4V / Claude | ~85% | $0.01-0.03/page | Complex/scanned tables |
 
 ---
 
-## 🛠️ Tech Stack
+## 🧪 Evaluation Suite
 
-| Layer | Technology |
-|---|---|
-| **LLM** | GPT-4o-mini via MeshAPI (OpenAI-compatible) |
-| **Embeddings** | `text-embedding-3-small` (dense) + `Qdrant/bm25` (sparse) |
-| **Vector DB** | Qdrant (hybrid search with RRF fusion) |
-| **Graph DB** | Neo4j (knowledge graph + Cypher QA) |
-| **Reranker** | `BAAI/bge-reranker-v2-m3` (cross-encoder) |
-| **Chunking** | Chonkie (token-based, 1000 tokens, 200 overlap) |
-| **PDF Parsing** | PyMuPDF + pdfplumber + LlamaParse |
-| **Orchestration** | LlamaIndex (core RAG) + LangChain (Graph RAG) |
-| **Logging** | Loguru |
+Unify includes a rigorous evaluation framework (`evaluation.py`) that tracks:
+
+1.  **Intent Classification Accuracy**: Measures how well the router selects the correct strategy.
+2.  **Verification Rate**: Percentage of LLM claims that are successfully verified against source docs.
+3.  **Faithfulness Score**: A composite metric measuring the density of verified vs. unverified claims.
+4.  **Latency Benchmarks**: P95 response times for each stage of the pipeline.
+
+---
+
+## ⚙️ Tech Stack
+
+- **Core**: LlamaIndex, LangChain
+- **LLMs**: GPT-4o-mini (via MeshAPI), Claude 3.5 Sonnet
+- **Vector Store**: Qdrant (Hybrid Search + RRF)
+- **Graph Store**: Neo4j
+- **Embeddings**: OpenAI `text-embedding-3-small`, BGE Sparse
+- **Verification**: Atomic Claim Decomposition (FinGround Pattern)
+- **Parsing**: LlamaParse, pdfplumber, PyMuPDF
 
 ---
 
 ## 📄 License
+
+MIT License. See `LICENSE` for details.
+
 
