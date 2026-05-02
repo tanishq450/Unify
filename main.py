@@ -341,6 +341,7 @@ Usage:
   python main.py ingest <pdf_path> <collection_name>
   python main.py query "<question>" <collection_name>
   python main.py interactive <collection_name>
+  python main.py evaluate [args...]
         """)
         sys.exit(1)
 
@@ -402,9 +403,16 @@ Usage:
             result = await orchestrator.query(user_input)
             print_result(result)
 
+    elif command == "evaluate":
+        import evaluation
+        # Adjust sys.argv so evaluation.py's argparse works correctly
+        sys.argv.pop(1)
+        sys.argv[0] = "evaluation.py"
+        evaluation.main()
+
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: ingest, query, interactive")
+        print("Available commands: ingest, query, interactive, evaluate")
         sys.exit(1)
 
 

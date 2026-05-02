@@ -395,11 +395,8 @@ class VisionModelExtractor:
         self.model = model
 
         if model.startswith("gpt"):
-            self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-            if not self.api_key:
-                raise ValueError("OPENAI_API_KEY required")
-            from openai import OpenAI
-            self.client = OpenAI(api_key=self.api_key)
+            from Model_loader.embedding_model import RawOpenAIClient
+            self.client = RawOpenAIClient().client
         elif model.startswith("claude"):
             self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
             if not self.api_key:
@@ -685,7 +682,7 @@ class UnifiedTableExtractor:
         """
 
         self.llama_parse_key = llama_parse_key or os.getenv("LLAMA_CLOUD_API_KEY")
-        self.openai_key = openai_key or os.getenv("OPENAI_API_KEY")
+        self.openai_key = openai_key or os.getenv("OPENAI_API_KEY") or os.getenv("MESH_API_KEY")
         self.anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY")
         self.prefer_local = prefer_local
 

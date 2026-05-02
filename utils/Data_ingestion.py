@@ -8,10 +8,7 @@ from llama_index.core import Document
 from pathlib import Path
 from llama_index.core import load_index_from_storage
 import loguru
-from implementations.Rag import Rag_pipeline
-from implementations.Graph_rag import GRAPH_RAG
 from Model_loader.llm import ModelLoader
-
 
 
 
@@ -123,6 +120,9 @@ async def unified_ingest(file_path: str, collection_name: str):
     
     logger = loguru.logger
     logger.info(f"Starting unified ingestion for {file_path} into collection '{collection_name}'")
+
+    from implementations.Rag import Rag_pipeline
+    from implementations.Graph_rag import GRAPH_RAG
 
     # ---------------- 1. INGEST TO QDRANT (HYBRID RAG) ----------------
     try:

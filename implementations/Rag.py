@@ -132,9 +132,15 @@ class Rag_pipeline:
 
             # 2. Convert to node dicts
             reranked_nodes = [
-                {"text": r.text}
-                for r in search_results
-            ]
+        {
+            "text": r.text,
+            "source": r.metadata.get("source"),
+            "page": r.page,
+            "chunk_id": r.chunk_id,
+            "section": r.section,
+        }
+        for r in search_results
+    ]
 
             # 3. Build context from top-3
             top_k_nodes = reranked_nodes[:3]
@@ -161,11 +167,22 @@ class Rag_pipeline:
 
             score = search_results[0].score if search_results else 0.0
 
-            return {
-                "answer": answer,
-                "score": score,
-                "nodes": reranked_nodes,
+            citations = [
+            {
+                "chunk_id": n["chunk_id"],
+                "page": n["page"],
+                "section": n["section"],
+                "source": n["source"]
             }
+            for n in top_k_nodes
+        ]
+
+            return {
+             "answer": answer,
+             "score": score,
+             "nodes": reranked_nodes,
+             "citations": citations,
+}
 
         except Exception:
             self.logger.exception("Query failed")

@@ -16,13 +16,13 @@ class ModelLoader:
     def load_models(self):
         """Load LlamaIndex LLM and embedding model (OpenAI-compatible via MeshAPI)."""
         self.llm = OpenAI(
-            model="gpt-4o-mini",
+            model="ai21/jamba-1-5-large-v1",
             temperature=0.1,
             api_base=MESH_API_BASE,
             api_key=MESH_API_KEY,
         )
         self.embed_model = OpenAIEmbedding(
-            model="text-embedding-3-small",
+            model="",
             api_base=MESH_API_BASE,
             api_key=MESH_API_KEY,
         )
@@ -45,7 +45,7 @@ class ModelLoader:
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model="gpt-4o-mini",
+            model="ai21/jamba-1-5-large-v1",
             temperature=0.1,
             openai_api_base=MESH_API_BASE,
             openai_api_key=MESH_API_KEY,

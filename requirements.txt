@@ -1,9 +1,9 @@
-# ── LlamaIndex Core ──────────────────────────────────────────────────
+# ── LlamaIndex Core & Plugins ────────────────────────────────────────
+llama-index
 llama-index-core
 llama-index-llms-openai
 llama-index-embeddings-openai
 llama-index-readers-file
-llama-index-vector-stores-qdrant
 
 # ── LangChain (Graph RAG) ───────────────────────────────────────────
 langchain-openai
@@ -35,3 +35,8 @@ pandas
 
 # ── Logging ─────────────────────────────────────────────────────────
 loguru
+
+# ── API / Web Server ────────────────────────────────────────────────
+fastapi
+uvicorn
+python-multipart
