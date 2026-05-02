@@ -6,6 +6,7 @@ from implementations.Rag import Rag_pipeline
 from implementations.Graph_rag import GRAPH_RAG
 from implementations.intent_classifier import IntentClassifier, AdaptiveRouter, RAGStrategy
 from implementations.hallucination_verifier import FinGroundVerifier
+from implementations.hybrid_retriever import HybridRetriever, FinanceHybridRetriever
 
 __all__ = [
     "Rag_pipeline",
@@ -14,4 +15,6 @@ __all__ = [
     "AdaptiveRouter",
     "RAGStrategy",
     "FinGroundVerifier",
+    "HybridRetriever",
+    "FinanceHybridRetriever",
 ]

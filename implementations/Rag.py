@@ -4,13 +4,11 @@ from pathlib import Path
 from Model_loader.llm import ModelLoader
 from utils.Data_ingestion import chunking, Docloader
 
-from llama_index.core.postprocessor import SentenceTransformerRerank
-
 from qdrant.qdrant import QdrantHybridClient
 from qdrant_client.models import SparseVector
 from fastembed import SparseTextEmbedding
-from types import SimpleNamespace
-from llama_index.core.schema import NodeWithScore, TextNode
+from implementations.hybrid_retriever import HybridRetriever
+
 
 # Initialize sparse model globally to avoid reloading
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
@@ -21,24 +19,25 @@ def compute_sparse_vectors(texts: list[str]):
     return embeddings
 
 
-# ---------------- Reranker ----------------
-reranker = SentenceTransformerRerank(
-    model="BAAI/bge-reranker-v2-m3",
-    top_n=5
-)
-
-
 class Rag_pipeline:
     def __init__(self):
         self.logger = loguru.logger
 
         # Core components
         self.model_loader = ModelLoader()
+        self.model_loader.load_models()
+        self.model_loader.set_settings()
+
         self.docloader = Docloader()
         self.chunker = chunking()
 
-        # Qdrant hybrid client
+        # Qdrant hybrid client (for ingestion)
         self.qdrant = QdrantHybridClient()
+
+        # Hybrid retriever (for search — reranking + MMR)
+        self.retriever = HybridRetriever(
+            embed_model=self.model_loader.embed_model,
+        )
 
     # ---------------- PREP ----------------
     def _prepare_documents(self, file_path):
@@ -62,7 +61,6 @@ class Rag_pipeline:
 
     # ---------------- BUILD POINTS ----------------
 
-
     def _build_points(self, texts, dense_embeddings, sparse_vectors):
         from qdrant_client.models import PointStruct
 
@@ -76,15 +74,15 @@ class Rag_pipeline:
             )
 
             points.append(
-            PointStruct(
-                id=i,
-                vector={
-                    "text_dense": dense,
-                    "bm25_sparse": sparse_vector
-                },
-                payload={"text": text}
+                PointStruct(
+                    id=i,
+                    vector={
+                        "text_dense": dense,
+                        "bm25_sparse": sparse_vector
+                    },
+                    payload={"text": text}
+                )
             )
-        )
 
         return points
 
@@ -92,9 +90,6 @@ class Rag_pipeline:
     async def ingest(self, file_path: str, persist_dir: str):
 
         try:
-            self.model_loader.load_models()
-            self.model_loader.set_settings()
-
             collection_name = Path(persist_dir).name
 
             # 1. Prepare data
@@ -120,56 +115,32 @@ class Rag_pipeline:
     async def query(self, query: str, persist_dir: str):
 
         try:
-            self.model_loader.load_models()
-            self.model_loader.set_settings()
-
             collection_name = Path(persist_dir).name
 
-            # 1. Query embeddings
-            query_dense = self.model_loader.embed_model.get_text_embedding(query)
-            if hasattr(query_dense, "tolist"):
-                query_dense = query_dense.tolist()
-
-            sparse_obj = compute_sparse_vectors([query])[0]
-            query_sparse = {
-                "indices": sparse_obj.indices.tolist() if hasattr(sparse_obj.indices, "tolist") else sparse_obj.indices,
-                "values": sparse_obj.values.tolist() if hasattr(sparse_obj.values, "tolist") else sparse_obj.values,
-            }
-
-            # 2. Hybrid search
-            results = await self.qdrant.search(
-                collection_name,
-                query_dense,
-                query_sparse,
-                top_k=10
+            # 1. Hybrid search + cross-encoder reranking (+ optional MMR)
+            search_results = await self.retriever.search(
+                query=query,
+                collection_name=collection_name,
+                k=5,
+                k_candidates=20,
+                apply_mmr=True,
+                mmr_diversity=0.7,
             )
 
-            # 3. Extract texts
-            texts = [r.payload["text"] for r in results]
+            if not search_results:
+                return {"answer": "", "score": 0.0, "nodes": []}
 
-            # 4. Convert to Llama nodes
-            llama_nodes = [
-                NodeWithScore(node=TextNode(text=t), score=1.0)
-                for t in texts
-            ]
-
-            # 5. Rerank
-            reranked = reranker.postprocess_nodes(
-                llama_nodes,
-                query_str=query
-            )
-
-            # 6. Convert to dict
+            # 2. Convert to node dicts
             reranked_nodes = [
-                {"text": n.node.get_content()}
-                for n in reranked
+                {"text": r.text}
+                for r in search_results
             ]
 
-            # 7. Build context
+            # 3. Build context from top-3
             top_k_nodes = reranked_nodes[:3]
             context = "\n\n".join([n["text"] for n in top_k_nodes])
 
-            # 8. LLM synthesis (REAL RAG)
+            # 4. LLM synthesis
             prompt = f"""
             You are a helpful AI assistant.
 
@@ -188,12 +159,12 @@ class Rag_pipeline:
 
             answer = str(response)
 
-            score = reranked[0].score if reranked else 0.0
+            score = search_results[0].score if search_results else 0.0
 
             return {
                 "answer": answer,
                 "score": score,
-                "nodes": reranked_nodes,  
+                "nodes": reranked_nodes,
             }
 
         except Exception:
