@@ -22,6 +22,9 @@ import asyncio
 import sys
 import os
 import loguru
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from Model_loader.llm import ModelLoader
 from implementations.intent_classifier import IntentClassifier, RAGStrategy
@@ -29,6 +32,7 @@ from implementations.Rag import Rag_pipeline
 from implementations.Graph_rag import GRAPH_RAG
 from implementations.hallucination_verifier import FinGroundVerifier
 from utils.Data_ingestion import Docloader, unified_ingest
+from langchain_anthropic import ChatAnthropic
 
 
 logger = loguru.logger
@@ -91,14 +95,20 @@ class FinanceRAGOrchestrator:
             self.graph_rag = GRAPH_RAG()
             # Graph RAG needs a LangChain-compatible LLM
             from langchain_openai import ChatOpenAI
-            import os
-            langchain_llm = ChatOpenAI(
+            api_key = os.getenv("MESH_API_KEY")
+            if not api_key:
+                logger.warning("Graph RAG: MESH_API_KEY not found in environment. Graph ingestion will fail.")
+            
+            langchain_llm = ChatAnthropic(
                 model="anthropic/claude-opus-4.1",
                 temperature=0.1,
-                openai_api_base=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
-                openai_api_key=os.getenv("MESH_API_KEY", "rsk_01KQMA836XVPYT6HX34QDX8KPG"),
+                max_tokens=4096,
+                base_url=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
+                api_key=api_key,
             )
+
             self.graph_rag.load_llm(langchain_llm)
+
             logger.info("Graph RAG connected ✓")
         except Exception as e:
             logger.warning(f"Graph RAG unavailable (Neo4j down?): {e}")
@@ -112,7 +122,7 @@ class FinanceRAGOrchestrator:
                 TableAwareRAG,
             )
 
-            extractor = UnifiedTableExtractor(prefer_local=True)
+            extractor = UnifiedTableExtractor(prefer_local=False)
             self.table_rag = TableAwareRAG(extractor)
             self.table_rag.ingest(pdf_path)
             logger.info("Table-aware RAG loaded ✓")
@@ -124,7 +134,7 @@ class FinanceRAGOrchestrator:
     # Ingestion
     # ------------------------------------------------------------------
 
-    async def ingest(self, file_path: str):
+    async def ingest(self, file_path: str, max_graph_chunks: int = 20):
         """
         Ingest a PDF into both Qdrant (hybrid RAG) and Neo4j (graph RAG).
         Also pre-loads table RAG for the document.
@@ -136,7 +146,7 @@ class FinanceRAGOrchestrator:
         logger.info(f"Starting ingestion for: {file_path}")
 
         # Hybrid + Graph RAG ingestion
-        await unified_ingest(file_path, self.collection_name)
+        await unified_ingest(file_path, self.collection_name, max_graph_chunks=max_graph_chunks)
 
         # Table RAG (pre-extract tables for multimodal queries)
         self._init_table_rag(file_path)

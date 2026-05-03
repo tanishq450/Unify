@@ -115,7 +115,7 @@ class chunking:
         return documents
 
 
-async def unified_ingest(file_path: str, collection_name: str):
+async def unified_ingest(file_path: str, collection_name: str, max_graph_chunks: int = 20):
     """
     Unified Ingestion Orchestrator:
     Pushes data to both Qdrant (Hybrid RAG) and Neo4j (Graph RAG).
@@ -139,6 +139,7 @@ async def unified_ingest(file_path: str, collection_name: str):
     # ---------------- 2. INGEST TO NEO4J (GRAPH RAG) ----------------
     try:
         logger.info("Starting Neo4j ingestion...")
+        from langchain_openai import ChatOpenAI
         loader = Docloader()
         text = loader.load_pdf(file_path)
         
@@ -146,18 +147,23 @@ async def unified_ingest(file_path: str, collection_name: str):
             graph_rag = GRAPH_RAG()
             
             # Use LangChain-compatible LLM (required by LLMGraphTransformer)
-            from langchain_openai import ChatOpenAI
+            api_key = os.getenv("MESH_API_KEY")
+            if not api_key:
+                logger.warning("Neo4j Ingestion: MESH_API_KEY not found. Graph transformation will likely fail.")
+
             langchain_llm = ChatOpenAI(
                 model="anthropic/claude-opus-4.1",
                 temperature=0.1,
-                openai_api_base=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
-                openai_api_key=os.getenv("MESH_API_KEY", "rsk_01KQMA836XVPYT6HX34QDX8KPG"),
+                max_tokens=4096,
+                base_url=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
+                api_key=api_key,
             )
             graph_rag.load_llm(langchain_llm)
             
             # Convert and make graph
-            docs = graph_rag.convert_docs(text)
-            graph_rag.make_graph(docs)
+            # We limit the number of chunks to stay within token/rate limits
+            docs = graph_rag.convert_docs(text, chunk_size=4000)
+            graph_rag.make_graph(docs, max_docs=max_graph_chunks)
             logger.info("✅ Neo4j graph ingestion complete!")
         else:
             logger.error("No text could be extracted for graph ingestion.")

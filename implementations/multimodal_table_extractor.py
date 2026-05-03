@@ -71,13 +71,13 @@ class LlamaParseExtractor:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("LLAMA_API_KEY")
+        self.api_key = api_key or os.getenv("LLAMA_API_KEY") or os.getenv("LLAMA_CLOUD_API_KEY")
 
         if not self.api_key:
             raise ValueError(
                 "LlamaParse API key required. "
-                "Set LLAMA_CLOUD_API_KEY or pass api_key. "
-                "Get free key at: https://cloud.llamaindex.ai"
+                "Set LLAMA_API_KEY or LLAMA_CLOUD_API_KEY in your .env file. "
+                "Get a free key at: https://cloud.llamaindex.ai"
             )
 
         self.parser = None  # Lazy load
@@ -109,25 +109,25 @@ class LlamaParseExtractor:
 
         # Parse response contains markdown with table markers
         tables = []
-        full_text = documents[0].text
+        
+        for doc_idx, doc in enumerate(documents):
+            full_text = doc.text
+            # Split by table markers in markdown
+            table_blocks = self._extract_table_blocks(full_text)
 
-        # Split by table markers in markdown
-        # LlamaParse uses --- for table boundaries
-        table_blocks = self._extract_table_blocks(full_text)
-
-        for i, block in enumerate(table_blocks):
-            table = TableData(
-                table_id=f"table_{i}",
-                page=self._infer_page(block, full_text),
-                bbox=(0, 0, 0, 0),  # LlamaParse doesn't provide bbox
-                markdown=block,
-                headers=self._extract_headers(block),
-                num_rows=self._count_rows(block),
-                num_cols=self._count_cols(block),
-                table_type=self._classify_table(block),
-                confidence=0.9  # LlamaParse is reliable
-            )
-            tables.append(table)
+            for i, block in enumerate(table_blocks):
+                table = TableData(
+                    table_id=f"doc_{doc_idx}_table_{i}",
+                    page=doc.metadata.get("page_number", self._infer_page(block, full_text)),
+                    bbox=(0, 0, 0, 0),  # LlamaParse doesn't provide bbox
+                    markdown=block,
+                    headers=self._extract_headers(block),
+                    num_rows=self._count_rows(block),
+                    num_cols=self._count_cols(block),
+                    table_type=self._classify_table(block),
+                    confidence=0.9  # LlamaParse is reliable
+                )
+                tables.append(table)
 
         return tables
 
@@ -683,7 +683,7 @@ class UnifiedTableExtractor:
             prefer_local: If True, use pdfplumber even if API keys available
         """
 
-        self.llama_parse_key = llama_parse_key or os.getenv("LLAMA_API_KEY")
+        self.llama_parse_key = llama_parse_key or os.getenv("LLAMA_API_KEY") or os.getenv("LLAMA_CLOUD_API_KEY")
         self.openai_key = openai_key or os.getenv("OPENAI_API_KEY") or os.getenv("MESH_API_KEY")
         self.anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY")
         self.prefer_local = prefer_local

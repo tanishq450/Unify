@@ -553,14 +553,20 @@ class FinGroundVerifier:
     def _extract_primary_number(self, text: str) -> Optional[float]:
         """Extract the primary numerical value from text"""
 
-        # Handle $, B, M, K suffixes
-        pattern = r'[$€£]?([\d,]+\.?\d*)\s*([BbMmKk])?'
+        # Ensure we match a digit, handling $, B, M, K suffixes
+        pattern = r'[$€£]?(\d[\d,]*\.?\d*)\s*([BbMmKk])?'
         match = re.search(pattern, text)
 
         if not match:
             return None
 
-        value = float(match.group(1).replace(',', ''))
+        try:
+            raw_num = match.group(1).replace(',', '')
+            if not raw_num:
+                return None
+            value = float(raw_num)
+        except (ValueError, IndexError):
+            return None
         suffix = match.group(2)
 
         if suffix:
@@ -581,10 +587,16 @@ class FinGroundVerifier:
         """Extract all numbers with surrounding context"""
 
         results = []
-        pattern = r'[$€£]?([\d,]+\.?\d*)\s*([BbMmKk])?'
+        pattern = r'[$€£]?(\d[\d,]*\.?\d*)\s*([BbMmKk])?'
 
         for match in re.finditer(pattern, text):
-            value = float(match.group(1).replace(',', ''))
+            try:
+                raw_num = match.group(1).replace(',', '')
+                if not raw_num:
+                    continue
+                value = float(raw_num)
+            except (ValueError, IndexError):
+                continue
             suffix = match.group(2)
 
             if suffix:
