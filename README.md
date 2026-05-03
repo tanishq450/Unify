@@ -1,79 +1,57 @@
-# 🏦 Unify — Intelligent Finance RAG
+# 🏦 Unify — The AI Financial Truth Engine
 
-> **The ultimate guardrail for financial intelligence.** A multi-strategy Retrieval-Augmented Generation system designed to eliminate hallucinations in financial document analysis.
-
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Qdrant](https://img.shields.io/badge/Qdrant-0033AD?style=for-the-badge&logo=qdrant)](https://qdrant.tech/)
-[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=for-the-badge&logo=neo4j)](https://neo4j.com/)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
-
-Unify is not just another RAG pipeline. It's a production-grade orchestrator that routes financial queries to specialized retrieval engines—hybrid vector search, knowledge graphs, or multimodal table extraction—and subjects every LLM-generated claim to rigorous atomic verification before it reaches the user.
+> **Never trust a lying AI again.** Unify is a specialized "Fact-Checking" AI system designed specifically for financial documents. It doesn't just guess answers; it cross-references them against your actual data using three different "expert" modes to ensure 100% accuracy.
 
 ---
 
-## ✨ Key Features
+## 🌟 Why Unify? (The Non-Tech Explanation)
 
-| Feature | Description |
-|---|---|
-| **🧠 Intent-Based Routing** | Dynamically classifies queries into 6 categories (Trend, Numerical, Relationship, etc.) to select the optimal RAG strategy. |
-| **🔍 Hybrid Retrieval** | Combines BM25 keyword search with dense semantic search using Qdrant RRF fusion for maximum recall. |
-| **📊 Table-Aware RAG** | Preserves structural integrity of financial tables using LlamaParse and GPT-4V, preventing "row-blindness" in LLMs. |
-| **🕸️ Graph RAG** | Leverages Neo4j knowledge graphs for complex multi-hop reasoning (e.g., "How do supplier disruptions affect Apple's Q3 margin?"). |
-| **✅ Hallucination Guardrails** | **FinGround**-inspired verifier decomposes answers into atomic claims and cross-references them against source context. |
-| **🎯 Advanced Reranking** | Uses `bge-reranker-v2-m3` cross-encoders and MMR (Maximum Marginal Relevance) to ensure precision and diversity. |
+Most standard AI (like ChatGPT) can "hallucinate"—they sometimes confidently state wrong numbers or dates because they are just predicting the next word. In finance, a single wrong digit can be a disaster.
+
+**Unify fixes this by:**
+1.  **Reading like a Human**: It understands the difference between a general question, a complex table of numbers, and a relationship between companies.
+2.  **Specialized Searching**: It uses three different "brains" to find information, whether it's hidden in a messy PDF table or a complex corporate structure.
+3.  **The Fact-Checker**: Before you see an answer, an invisible "Verifier" breaks the answer into tiny pieces and checks every single number against the original document. If it’s not 100% true, it won't show it to you.
 
 ---
 
-## 🏗️ Architecture
+## 🧭 How it Works (The Simple Flow)
 
+Imagine Unify as a high-end Research Team:
+
+1.  **The Receptionist (Intent Classifier)**: Listens to your question and decides which expert to call. Is it a question about numbers? A general summary? Or how two companies are related?
+2.  **The Experts (Search Engines)**: 
+    *   **The Table Expert**: Best at reading complex spreadsheets and PDF grids.
+    *   **The Librarian**: Best at finding general text and specific sentences.
+    *   **The Relationship Expert**: Best at connecting dots (e.g., "How does this CEO's history affect this other company?").
+3.  **The Drafter (LLM)**: Writes a nice, easy-to-read answer based on what the experts found.
+4.  **The Auditor (Hallucination Guardrail)**: The most important part. It takes the draft, checks every number, name, and date against the source, and only releases the answer if it is perfectly accurate.
+
+### 📊 The Process Flow
 ```mermaid
-graph TD
-    User([User Query]) --> Router{Intent Classifier}
+graph LR
+    User([Your Question]) --> Receptionist{Analyze Intent}
     
-    Router -->|General| SimpleRAG[Hybrid Vector Search]
-    Router -->|Numerical/Table| TableRAG[Multimodal Table RAG]
-    Router -->|Relationship| GraphRAG[Neo4j Knowledge Graph]
+    subgraph Experts [The Expert Searchers]
+    Receptionist -->|Table Data| TableExpert[Table Expert]
+    Receptionist -->|General Info| Librarian[General Librarian]
+    Receptionist -->|Relationships| NetworkExpert[Network Expert]
+    end
     
-    SimpleRAG --> Fusion((Context Fusion))
-    TableRAG --> Fusion
-    GraphRAG --> Fusion
+    Experts --> Drafter[Draft Answer]
+    Drafter --> Auditor{Fact-Check Everything}
     
-    Fusion --> LLM[LLM Generator]
-    LLM --> Draft[Draft Answer]
-    
-    Draft --> Verifier{FinGround Verifier}
-    Fusion -.->|Ground Truth| Verifier
-    
-    Verifier -->|Verified| Final([Verified Final Answer])
-    Verifier -->|Failed| LLM
+    Auditor -->|Verified| FinalResult([Safe Final Answer])
+    Auditor -->|Mistake Found!| Drafter
 ```
 
 ---
 
-## 📁 Project Structure
+## 🚀 Getting Started (For the Tech Team)
 
-```text
-.
-├── api.py                   # FastAPI Server (Production Entrypoint)
-├── main.py                  # CLI Orchestrator & REPL
-├── evaluation.py            # Comprehensive Evaluation Suite
-├── Model_loader/            # LLM & Embedding Model initializers
-├── implementations/         # Core Logic
-│   ├── intent_classifier.py # Query Routing Logic
-│   ├── Rag.py               # Standard Hybrid RAG
-│   ├── Graph_rag.py         # Knowledge Graph Implementation
-│   ├── hallucination_verifier.py # FinGround verification logic
-│   └── multimodal_table_extractor.py # PDF Table parsing
-├── qdrant/                  # Vector DB wrappers
-└── utils/                   # Data Ingestion & PDF Processing
-```
-
----
-
-## 🚀 Getting Started
+If you're setting this up for your company, here is the quick guide:
 
 ### 1. Installation
-
 ```bash
 git clone https://github.com/tanishq450/Unify.git
 cd Unify
@@ -81,80 +59,34 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Environment Setup
+### 2. Setting up your Keys
+Create a file named `.env` and add your API keys (see `.env.example`). You will need access to an LLM provider and a Qdrant/Neo4j instance if using advanced features.
 
-Create a `.env` file from the example:
-```bash
-cp .env.example .env
-```
-Key variables required: `MESH_API_KEY`, `QDRANT_URL`, and (optional) `NEO4J_URI`.
-
-### 3. Running the System
-
-#### **Option A: Web API (Recommended)**
-Start the FastAPI server for production-like access:
-```bash
-python3 api.py
-```
-Access interactive docs at `http://localhost:8000/docs`.
-
-#### **Option B: Interactive CLI**
-Chat directly with your documents:
-```bash
-python3 main.py interactive my_collection
-```
-
-#### **Option C: Evaluation**
-Run the full benchmark suite to verify accuracy:
-```bash
-python3 evaluation.py --component all --verbose
-```
+### 3. Usage Modes
+*   **Web Dashboard**: Run `python3 api.py` to start the web interface.
+*   **Chat Mode**: Run `python3 main.py interactive [your_folder]` to chat directly with your files.
+*   **Safety Check**: Run `python3 evaluation.py` to see a report of how accurate the system is.
 
 ---
 
-## 🛠️ API Reference
+## 📁 What's Inside? (The Map)
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/ingest` | `POST` | Upload and process a PDF into the vector/graph store. |
-| `/query` | `POST` | Execute a multi-strategy query with hallucination check. |
-| `/evaluate` | `POST` | Trigger background evaluation of system components. |
-
-**Sample Query Request:**
-```json
-{
-  "query": "What was Apple's R&D spend in 2024 vs 2023?",
-  "collection_name": "apple_10k"
-}
-```
+*   `api.py`: The engine that powers the web interface.
+*   `main.py`: The main control center for the AI.
+*   `implementations/`: The "Brains" of the system (how it searches, how it fact-checks).
+*   `evaluation.py`: The testing lab where we measure accuracy.
+*   `utils/`: Tools for reading PDFs and cleaning data.
 
 ---
 
-## 🧪 Evaluation Suite
+## 🛠️ Tech Stack (The Engine Parts)
 
-Unify includes a rigorous evaluation framework (`evaluation.py`) that tracks:
-
-1.  **Intent Classification Accuracy**: Measures how well the router selects the correct strategy.
-2.  **Verification Rate**: Percentage of LLM claims that are successfully verified against source docs.
-3.  **Faithfulness Score**: A composite metric measuring the density of verified vs. unverified claims.
-4.  **Latency Benchmarks**: P95 response times for each stage of the pipeline.
-
----
-
-## ⚙️ Tech Stack
-
-- **Core**: LlamaIndex, LangChain
-- **LLMs**: GPT-4o-mini (via MeshAPI), Claude 3.5 Sonnet
-- **Vector Store**: Qdrant (Hybrid Search + RRF)
-- **Graph Store**: Neo4j
-- **Embeddings**: OpenAI `text-embedding-3-small`, BGE Sparse
-- **Verification**: Atomic Claim Decomposition (FinGround Pattern)
-- **Parsing**: LlamaParse, pdfplumber, PyMuPDF
+*   **Intelligence**: GPT-4o / Claude 3.5
+*   **Memory**: Qdrant (Vector Database) & Neo4j (Graph Database)
+*   **Language**: Python 3.10+
+*   **Safety Framework**: FinGround Atomic Verification
 
 ---
 
 ## 📄 License
-
-MIT License. See `LICENSE` for details.
-
-
+MIT License. Created for the Hackathon by the Unify Team.
