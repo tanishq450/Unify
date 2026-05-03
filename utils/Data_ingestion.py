@@ -162,7 +162,7 @@ async def unified_ingest(file_path: str, collection_name: str, max_graph_chunks:
             
             # Convert and make graph
             # We limit the number of chunks to stay within token/rate limits
-            docs = graph_rag.convert_docs(text, chunk_size=4000)
+            docs = graph_rag.convert_docs(text, chunk_size=1200)
             graph_rag.make_graph(docs, max_docs=max_graph_chunks)
             logger.info("✅ Neo4j graph ingestion complete!")
         else:

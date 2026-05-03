@@ -9,6 +9,9 @@ from langchain_core.messages import AIMessage
 from langchain_neo4j import Neo4jGraph, GraphCypherQAChain
 from langchain_core.documents import Document
 from langchain_experimental.graph_transformers import LLMGraphTransformer
+from json_repair import repair_json
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -16,6 +19,7 @@ from langchain_experimental.graph_transformers import LLMGraphTransformer
 # ---------------------------------------------------------------------------
 
 def _strip_markdown_fences(text: str) -> str:
+    """Remove ```json ... ``` or ``` ... ``` fences from a string."""
     if not isinstance(text, str):
         return text
     text = text.strip()
@@ -25,7 +29,31 @@ def _strip_markdown_fences(text: str) -> str:
 
 
 def _normalize_graph_schema(text: str) -> str:
+    """
+    Normalize Claude's JSON output to match DynamicGraph's Pydantic schema.
+
+    Claude returns:
+        {
+            "entities": [{"id": "X", "type": "Y"}, ...],
+            "relationships": [{"source": "X", "target": "Y", "type": "REL"}, ...]
+        }
+
+    DynamicGraph expects:
+        {
+            "nodes": [{"id": "X", "type": "Y"}, ...],
+            "relationships": [
+                {
+                    "source_node_id": "X", "source_node_type": "Y",
+                    "target_node_id": "A", "target_node_type": "B",
+                    "type": "REL"
+                }, ...
+            ]
+        }
+    """
     try:
+      
+
+        text = repair_json(text)
         data = json.loads(text)
 
         # ── 1. entities -> nodes ──────────────────────────────────────
@@ -39,7 +67,7 @@ def _normalize_graph_schema(text: str) -> str:
             ]
             del data["entities"]
 
-        # ── 2. fix existing nodes ─────────────────────────────────────
+        # ── 2. fix existing nodes (label -> type, name -> id) ─────────
         for node in data.get("nodes", []):
             if "type" not in node and "label" in node:
                 node["type"] = node["label"]
@@ -51,26 +79,21 @@ def _normalize_graph_schema(text: str) -> str:
             data["relationships"] = data.pop("edges")
 
         # ── 4. remap relationship fields to DynamicGraph schema ───────
-        #
-        #  Claude returns:
-        #    {"source": "X", "target": "Y", "type": "REL"}
-        #
-        #  DynamicGraph expects:
-        #    {"source_node_id": "X", "source_node_type": "?",
-        #     "target_node_id": "Y", "target_node_type": "?",
-        #     "type": "REL"}
-        #
-        # Build a node-type lookup from the nodes list
+        # Claude sends:  {"source": "X", "target": "Y", "type": "REL"}
+        # DynamicGraph:  {"source_node_id": "X", "source_node_type": "?",
+        #                 "target_node_id": "Y", "target_node_type": "?",
+        #                 "type": "REL"}
         node_type_map = {
             n["id"]: n.get("type", "Entity")
             for n in data.get("nodes", [])
+            if "id" in n
         }
 
         fixed_rels = []
         for rel in data.get("relationships", []):
-            src = rel.get("source", rel.get("source_node_id", ""))
-            tgt = rel.get("target", rel.get("target_node_id", ""))
-            rel_type = rel.get("type", rel.get("label", "RELATED_TO"))
+            src      = rel.get("source",      rel.get("source_node_id", ""))
+            tgt      = rel.get("target",      rel.get("target_node_id", ""))
+            rel_type = rel.get("type",        rel.get("label", "RELATED_TO"))
 
             fixed_rels.append({
                 "source_node_id":   src,
@@ -88,111 +111,156 @@ def _normalize_graph_schema(text: str) -> str:
         return text
 
 
-def _extract_content_from_claude(result: Any) -> str:
+def _extract_content_from_claude(result: Any) -> Optional[str]:
     """
-    Claude returns tool_use blocks inside AIMessage.content as a list.
-    This extracts the actual JSON payload regardless of format.
+    Extract JSON string from whatever format Claude returns.
+    Returns None if result is already a parsed Pydantic model.
     """
-    # Case 1:
+    # Case 1: plain string content
     if isinstance(result, AIMessage) and isinstance(result.content, str):
         return result.content
 
     # Case 2: Claude tool_use block — content is a list of dicts
     if isinstance(result, AIMessage) and isinstance(result.content, list):
         for block in result.content:
-            # Tool use block has 'input' dict with the structured data
             if isinstance(block, dict):
                 if block.get("type") == "tool_use" and "input" in block:
                     return json.dumps(block["input"])
-                # Sometimes it's a text block
                 if block.get("type") == "text" and "text" in block:
                     return block["text"]
 
-    # Case 3: already a dict (structured output parsed by langchain)
+    # Case 3: already a plain dict
     if isinstance(result, dict):
         return json.dumps(result)
 
-    # Case 4: Pydantic model already parsed
-    if hasattr(result, "model_dump"):
-        return json.dumps(result.model_dump())
+    # Case 4: Pydantic model — already parsed, signal with None
+    # covers Pydantic v2 (model_fields) and v1 (__fields__)
+    if hasattr(result, "model_fields") or hasattr(result, "__fields__"):
+        return None
 
     return str(result)
 
 
 def _clean_claude_output(result: Any) -> AIMessage:
-    """Extract, clean and normalize Claude's response into a plain AIMessage."""
+    """
+    Extract, strip fences, normalize schema, and wrap in AIMessage.
+    Used by invoke() and ainvoke() which must always return an AIMessage.
+    """
     content = _extract_content_from_claude(result)
+
+    # None means result is already a Pydantic model — serialize it back
+    # to a string so the rest of the pipeline gets a valid AIMessage
+    if content is None:
+        content = (
+            result.model_dump_json()
+            if hasattr(result, "model_dump_json")
+            else str(result)
+        )
+
     content = _strip_markdown_fences(content)
     content = _normalize_graph_schema(content)
-    additional_kwargs = result.additional_kwargs if hasattr(result, "additional_kwargs") else {}
+
+    additional_kwargs = (
+        result.additional_kwargs
+        if hasattr(result, "additional_kwargs")
+        else {}
+    )
     return AIMessage(content=content, additional_kwargs=additional_kwargs)
 
 
 # ---------------------------------------------------------------------------
-# LLM Wrapper 
+# LLM Wrapper — Claude specific
 # ---------------------------------------------------------------------------
+
+
+from typing import Any
+from langchain_core.runnables import RunnableSerializable, RunnableLambda
+
 
 class MarkdownStrippingLLM(RunnableSerializable):
     """
-    Claude-specific LLM wrapper for LLMGraphTransformer.
+    Claude-safe wrapper for LLMGraphTransformer.
 
-    Claude uses tool_use blocks for structured output, NOT plain JSON text.
-    This wrapper intercepts at the right level so cleaning happens
-    BEFORE Pydantic validation.
+    Fixes:
+    - strips markdown fences BEFORE validation
+    - normalizes graph schema
+    - handles include_raw contract
+    - avoids premature validation
     """
 
     llm: Any
 
     def invoke(self, input, config=None, **kwargs):
         result = self.llm.invoke(input, config=config, **kwargs)
-        return _clean_claude_output(result)
+
+        content = _extract_content_from_claude(result)
+
+        if content is None:
+            return str(result)
+
+        content = _strip_markdown_fences(content)
+        content = _normalize_graph_schema(content)
+
+        return content
 
     async def ainvoke(self, input, config=None, **kwargs):
         result = await self.llm.ainvoke(input, config=config, **kwargs)
-        return _clean_claude_output(result)
+
+        content = _extract_content_from_claude(result)
+
+        if content is None:
+            return str(result)
+
+        content = _strip_markdown_fences(content)
+        content = _normalize_graph_schema(content)
+
+        return content
 
     def with_structured_output(self, schema, **kwargs):
         """
-        CRITICAL for Claude:
-        Do NOT call self.llm.with_structured_output() — Claude will use
-        tool calling and bypass our cleaner entirely.
-
-        Instead: call raw LLM → extract tool_use input → parse into schema.
+        Manual structured parsing.
+        Avoids native structured output because it validates too early.
         """
 
-        def extract_and_parse(result):
-            # Step 1: extract raw content (handles tool_use blocks)
-            content = _extract_content_from_claude(result)
+        include_raw = kwargs.get("include_raw", False)
 
-            # Step 2: strip any markdown fences
+        raw_llm = self.llm   # raw model only
+
+        def clean_and_parse(result):
+            raw_result = result
+
+            # Extract content
+            content = _extract_content_from_claude(raw_result)
+
+            if content is None:
+                raise ValueError(
+                    "Failed to extract content from model output"
+                )
+
+            # CLEAN FIRST
             content = _strip_markdown_fences(content)
 
-            # Step 3: normalize schema
+            # NORMALIZE SECOND
             content = _normalize_graph_schema(content)
 
-            # Step 4: parse into Pydantic schema
-            try:
-                # Pydantic v2
-                return schema.model_validate_json(content)
-            except AttributeError:
-                pass
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to parse into {schema.__name__}: {e}\n"
-                    f"Content (first 500 chars): {content[:500]}"
-                )
+            # VALIDATE LAST
+            if hasattr(schema, "model_validate_json"):
+                parsed = schema.model_validate_json(content)
+            else:
+                parsed = schema.parse_raw(content)
 
-            try:
-                # Pydantic v1
-                return schema.parse_raw(content)
-            except Exception as e:
-                raise ValueError(
-                    f"Pydantic v1 parse failed for {schema.__name__}: {e}\n"
-                    f"Content (first 500 chars): {content[:500]}"
-                )
+            if include_raw:
+                return {
+                    "raw": raw_result,
+                    "parsed": parsed,
+                    "parsing_error": None,
+                }
 
-        # Chain: this wrapper's invoke (which cleans) → parse into schema
-        return self | RunnableLambda(extract_and_parse)
+            return parsed
+
+        # IMPORTANT:
+        # raw model → cleanup → validation
+        return raw_llm | RunnableLambda(clean_and_parse)
 
     @property
     def InputType(self):
@@ -202,12 +270,31 @@ class MarkdownStrippingLLM(RunnableSerializable):
     def OutputType(self):
         return Any
 
-
+ 
+        
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
 
 class GRAPH_RAG:
+    """
+    Graph RAG using Neo4j + LangChain + Claude.
+
+    Quick-start
+    -----------
+    from langchain_anthropic import ChatAnthropic
+
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+
+    rag = GRAPH_RAG()
+    rag.load_llm(llm)
+
+    docs = rag.convert_docs(your_long_text)
+    rag.make_graph(docs)
+
+    answer = rag.query("Who are the main entities?")
+    print(answer)
+    """
 
     def __init__(self, llm: Optional[Any] = None):
         self.log = loguru.logger
@@ -216,6 +303,7 @@ class GRAPH_RAG:
         self._init_graph()
 
     def _init_graph(self):
+        """Initialise Neo4j connection from environment variables."""
         try:
             self.graph = Neo4jGraph(
                 url=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
@@ -231,6 +319,7 @@ class GRAPH_RAG:
             self.graph = None
 
     def load_llm(self, llm_instance: Any):
+        """Attach an LLM instance (ChatAnthropic, ChatOpenAI, etc.)."""
         self.llm = llm_instance
         self.log.info("LLM loaded successfully.")
 
@@ -240,6 +329,7 @@ class GRAPH_RAG:
         chunk_size: int = 4000,
         chunk_overlap: int = 400,
     ) -> List[Document]:
+        """Split text into overlapping chunks and return LangChain Documents."""
         try:
             try:
                 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -253,6 +343,7 @@ class GRAPH_RAG:
             docs = splitter.create_documents([text])
             self.log.info(f"Created {len(docs)} chunks.")
             return docs
+
         except Exception as e:
             self.log.error(f"Chunking failed: {e}")
             return []
@@ -262,6 +353,9 @@ class GRAPH_RAG:
         documents: List[Document],
         max_docs: int = 30,
     ) -> Optional[list]:
+        """
+        Extract entities & relationships from documents and store in Neo4j.
+        """
         if not self.llm:
             self.log.error("LLM not loaded. Call load_llm() first.")
             return None
@@ -275,8 +369,7 @@ class GRAPH_RAG:
             documents = documents[:max_docs]
 
         try:
-            # ── Claude-specific wrapper ──
-            wrapped_llm = _MarkdownStrippingLLM(llm=self.llm)
+            wrapped_llm = MarkdownStrippingLLM(llm=self.llm)
 
             transformer = LLMGraphTransformer(
                 llm=wrapped_llm,
@@ -301,6 +394,7 @@ class GRAPH_RAG:
             return None
 
     def get_graph_chain(self) -> Optional[GraphCypherQAChain]:
+        """Build and return a GraphCypherQAChain."""
         if not self.llm or not self.graph:
             self.log.error("LLM or graph missing.")
             return None
@@ -314,11 +408,13 @@ class GRAPH_RAG:
             )
             self.log.info("Graph QA chain created.")
             return chain
+
         except Exception as e:
             self.log.error(f"Chain creation failed: {e}")
             return None
 
     def query(self, question: str) -> Any:
+        """Run question against the graph and return the answer."""
         chain = self.get_graph_chain()
         if not chain:
             return "Unable to initialise graph chain."
