@@ -1,33 +1,43 @@
-# 🏦 Unify — The AI Financial Truth Engine
+<div align="center">
+  <img src="unify_logo_1777839039166.png" width="200" alt="Unify Logo">
+  <h1>🏦 Unify — The AI Financial Truth Engine</h1>
+  <p><i>Ensuring 100% accuracy in financial document analysis through specialized verification modes.</i></p>
 
-> **Never trust a lying AI again.** Unify is a specialized "Fact-Checking" AI system designed specifically for financial documents. It doesn't just guess answers; it cross-references them against your actual data using three different "expert" modes to ensure 100% accuracy.
-
----
-
-## 🌟 Why Unify? (The Non-Tech Explanation)
-
-Most standard AI (like ChatGPT) can "hallucinate"—they sometimes confidently state wrong numbers or dates because they are just predicting the next word. In finance, a single wrong digit can be a disaster.
-
-**Unify fixes this by:**
-1.  **Reading like a Human**: It understands the difference between a general question, a complex table of numbers, and a relationship between companies.
-2.  **Specialized Searching**: It uses three different "brains" to find information, whether it's hidden in a messy PDF table or a complex corporate structure.
-3.  **The Fact-Checker**: Before you see an answer, an invisible "Verifier" breaks the answer into tiny pieces and checks every single number against the original document. If it’s not 100% true, it won't show it to you.
+  [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Security: FinGround](https://img.shields.io/badge/Security-FinGround-green.svg)](https://github.com/tanishq450/Unify)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+</div>
 
 ---
 
-## 🧭 How it Works (The Simple Flow)
+## 🌟 Why Unify?
+Most standard AI models can "hallucinate"—confidently stating incorrect numbers or dates. In finance, a single wrong digit can be catastrophic. 
 
-Imagine Unify as a high-end Research Team:
+**Unify solves this through:**
+*   🔍 **Human-Like Reading**: Distinguishes between general queries, complex tables, and corporate relationships.
+*   🧠 **Multi-Expert Search**: Utilizes three specialized "brains" to extract data from messy PDFs and complex structures.
+*   🛡️ **Atomic Verification**: An automated Auditor breaks down answers and cross-references every single data point against the source.
 
-1.  **The Receptionist (Intent Classifier)**: Listens to your question and decides which expert to call. Is it a question about numbers? A general summary? Or how two companies are related?
+---
+
+## 🎬 Demo Video
+Experience Unify in action: **[Watch the Demo Video](https://drive.google.com/file/d/17pUyqtszgPQlldslHN7WFAUKSjljfBPP/view?usp=sharing)**
+
+---
+
+## 🧭 System Architecture
+Imagine Unify as a high-end Research Team working in concert:
+
+1.  **The Receptionist (Intent Classifier)**: Routes your question to the correct expert.
 2.  **The Experts (Search Engines)**: 
-    *   **The Table Expert**: Best at reading complex spreadsheets and PDF grids.
-    *   **The Librarian**: Best at finding general text and specific sentences.
-    *   **The Relationship Expert**: Best at connecting dots (e.g., "How does this CEO's history affect this other company?").
-3.  **The Drafter (LLM)**: Writes a nice, easy-to-read answer based on what the experts found.
-4.  **The Auditor (Hallucination Guardrail)**: The most important part. It takes the draft, checks every number, name, and date against the source, and only releases the answer if it is perfectly accurate.
+    *   **The Table Expert**: Specialized in PDF grids and spreadsheets.
+    *   **The Librarian**: Expert at semantic search and document retrieval.
+    *   **The Relationship Expert**: Maps connections between entities (CEO histories, corporate ties).
+3.  **The Drafter (LLM)**: Synthesizes the expert findings into a readable answer.
+4.  **The Auditor (Hallucination Guardrail)**: The final gatekeeper. Verifies every number, name, and date before release.
 
-### 📊 The Process Flow
+### 📊 Process Flow
 ```mermaid
 graph LR
     User([Your Question]) --> Receptionist{Analyze Intent}
@@ -47,45 +57,83 @@ graph LR
 
 ---
 
-## 🚀 Getting Started (For the Tech Team)
+## 🚀 Getting Started
 
-If you're setting this up for your company, here is the quick guide:
-
-### 1. Installation
+### 1️⃣ Installation
 ```bash
+# Clone the repository
 git clone https://github.com/tanishq450/Unify.git
 cd Unify
-python3 -m venv .venv && source .venv/bin/activate
+
+# Set up environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Setting up your Keys
-Create a file named `.env` and add your API keys (see `.env.example`). You will need access to an LLM provider and a Qdrant/Neo4j instance if using advanced features.
+### 2️⃣ Configuration
+Create a `.env` file in the root directory and add your API keys (see `.env.example` for reference).
+```bash
+cp .env.example .env
+# Edit .env with your LLM provider and database keys
+```
 
-### 3. Usage Modes
-*   **Web Dashboard**: Run `python3 api.py` to start the web interface.
-*   **Chat Mode**: Run `python3 main.py interactive [your_folder]` to chat directly with your files.
-*   **Safety Check**: Run `python3 evaluation.py` to see a report of how accurate the system is.
-
----
-
-## 📁 What's Inside? (The Map)
-
-*   `api.py`: The engine that powers the web interface.
-*   `main.py`: The main control center for the AI.
-*   `implementations/`: The "Brains" of the system (how it searches, how it fact-checks).
-*   `evaluation.py`: The testing lab where we measure accuracy.
-*   `utils/`: Tools for reading PDFs and cleaning data.
+### 3️⃣ Usage Modes
+| Mode | Command | Description |
+| :--- | :--- | :--- |
+| **Web Dashboard** | `python3 api.py` | Launches the interactive web interface. |
+| **Interactive Chat** | `python3 main.py interactive [folder]` | Chat directly with your local financial documents. |
+| **Safety Evaluation** | `python3 evaluation.py` | Runs the accuracy report and verification benchmarks. |
 
 ---
 
-## 🛠️ Tech Stack (The Engine Parts)
+## 📁 Project Structure
+```text
+.
+├── api.py                   # Web interface engine
+├── main.py                  # Main control center
+├── evaluation.py            # Testing and accuracy lab
+├── implementations/         # Core logic (Search & Fact-checking)
+│   ├── Graph_rag.py         # Relationship mapping
+│   ├── hybrid_retriever.py  # Advanced search
+│   └── hallucination_verifier.py # The Auditor
+├── utils/                   # PDF processing and data cleaning
+├── Model_loader/            # LLM initialization
+└── qdrant/                  # Vector database integration
+```
 
+---
+
+## 🛠️ Tech Stack
 *   **Intelligence**: GPT-4o / Claude 3.5
-*   **Memory**: Qdrant (Vector Database) & Neo4j (Graph Database)
+*   **Memory**: [Qdrant](https://qdrant.tech/) (Vector DB) & [Neo4j](https://neo4j.com/) (Graph DB)
 *   **Language**: Python 3.10+
-*   **Safety Framework**: FinGround Atomic Verification
+*   **Framework**: FinGround Atomic Verification
 
 ---
 
+## ⚠️ Current Limitations
+*   **Graph Extraction**: Can fail on malformed structured outputs.
+*   **Table Extraction**: Heavily dependent on the quality of the source PDF.
+*   **Intent Classification**: Currently utilizes regex-based logic which may miss edge cases.
+*   **Latency**: The multi-step verification process increases overall response time.
+*   **Ingestion Speed**: Processing large financial reports significantly increases ingestion time.
 
+---
+
+## 🔮 Future Scope
+*   🎯 **Specialized Classifier**: Fine-tuned finance-specific query classifier for better routing.
+*   📉 **Reliability**: Enhanced graph extraction reliability and robustness.
+*   🌐 **Real-time Data**: Integration with live financial market data feeds.
+*   📊 **Comparative Analysis**: Multi-document comparative analysis across multiple reporting periods.
+*   🖥️ **Dashboards**: Rich financial dashboard visualizations for data insights.
+*   🤖 **Agentic Reporting**: Automated, agent-driven financial report generation.
+*   💎 **Portfolio Intelligence**: Advanced intelligence layer for portfolio-wide insights.
+
+---
+
+<div align="center">
+  <sub>Built for Financial Accuracy</sub>
+</div>
