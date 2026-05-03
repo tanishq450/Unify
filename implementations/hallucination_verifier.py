@@ -3,6 +3,7 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 import re
 import json
+import numpy as np
 from pydantic import BaseModel
 
 
@@ -664,53 +665,53 @@ class FinGroundVerifier:
         return 0.5  # Default
 
     def _infer_formula(self, text: str) -> Optional[str]:
-      """
-     Infer common finance formulas from text.
-    """
+        """
+        Infer common finance formulas from text.
+        """
 
-    text = text.lower()
+        text = text.lower()
 
-    formula_patterns = {
-        "gross margin": "(revenue-cogs)/revenue",
-        "operating margin": "operating_income/revenue",
-        "net margin": "net_income/revenue",
-        "profit margin": "net_income/revenue",
-        "eps": "net_income/shares_outstanding",
-        "debt ratio": "total_debt/total_assets",
-        "current ratio": "current_assets/current_liabilities",
-    }
+        formula_patterns = {
+            "gross margin": "(revenue-cogs)/revenue",
+            "operating margin": "operating_income/revenue",
+            "net margin": "net_income/revenue",
+            "profit margin": "net_income/revenue",
+            "eps": "net_income/shares_outstanding",
+            "debt ratio": "total_debt/total_assets",
+            "current ratio": "current_assets/current_liabilities",
+        }
 
-    for keyword, formula in formula_patterns.items():
-        if keyword in text:
-            return formula
+        for keyword, formula in formula_patterns.items():
+            if keyword in text:
+                return formula
 
-    return None
+        return None
 
 
     def _find_formula_components(
-    self,
-    formula: str,
-    context: List[str]
-) -> Optional[Dict]:
-     """
-    Extract variables required by formula from context.
-     """
+        self,
+        formula: str,
+        context: List[str]
+    ) -> Optional[Dict]:
+        """
+        Extract variables required by formula from context.
+        """
 
-    variables = set(re.findall(r"[a-zA-Z_]+", formula))
-    components = {}
+        variables = set(re.findall(r"[a-zA-Z_]+", formula))
+        components = {}
 
-    for var in variables:
-        pattern = rf"{var.replace('_', ' ')}.*?([$€£]?\d+[.,]?\d*[BbMmKk]?)"
+        for var in variables:
+            pattern = rf"{var.replace('_', ' ')}.*?([$€£]?\d+[.,]?\d*[BbMmKk]?)"
 
-        for ctx in context:
-            match = re.search(pattern, ctx, re.I)
-            if match:
-                value = self._extract_primary_number(match.group(1))
-                if value is not None:
-                    components[var] = value
-                    break
+            for ctx in context:
+                match = re.search(pattern, ctx, re.I)
+                if match:
+                    value = self._extract_primary_number(match.group(1))
+                    if value is not None:
+                        components[var] = value
+                        break
 
-    return components if components else None
+        return components if components else None
 
 
     def _evaluate_formula(
@@ -800,11 +801,11 @@ class FinGroundVerifier:
         return None
 
 
-        def _extract_numbers(
+    def _extract_numbers(
         self,
         text: str
     ) -> List[str]:
-         """
+        """
         Extract all raw numeric strings from text.
         """
 
@@ -813,50 +814,49 @@ class FinGroundVerifier:
             text
         )
 
+    def _dates_match(self, date_str: str, context: str) -> bool:
+        """Check if a date string appears in the context text."""
+        return date_str.lower() in context.lower()
 
 
-    # Import numpy at module level
-    import numpy as np
+# Example usage
+if __name__ == "__main__":
+    # Mock LLM client for testing
+    class MockLLM:
+        def generate(self, prompt: str) -> str:
+            return "Mock response"
 
+    # Initialize verifier
+    verifier = FinGroundVerifier(llm_client=MockLLM())
 
-    # Example usage
-    if __name__ == "__main__":
-        # Mock LLM client for testing
-        class MockLLM:
-            def generate(self, prompt: str) -> str:
-                return "Mock response"
+    # Test claim decomposition
+    answer = """
+    Apple's revenue was $383.29 billion in fiscal year 2024, up 2% year-over-year.
+    Gross margin was 44.1% compared to 44.9% in the prior year.
+    The company is subject to SEC Rule 10-K reporting requirements.
+    """
 
-        # Initialize verifier
-        verifier = FinGroundVerifier(llm_client=MockLLM())
+    claims = verifier.decompose(answer)
 
-        # Test claim decomposition
-        answer = """
-        Apple's revenue was $383.29 billion in fiscal year 2024, up 2% year-over-year.
-        Gross margin was 44.1% compared to 44.9% in the prior year.
-        The company is subject to SEC Rule 10-K reporting requirements.
-        """
+    print(f"Decomposed into {len(claims)} claims:\n")
+    for i, claim in enumerate(claims):
+        print(f"{i+1}. [{claim.claim_type.value}] {claim.text}")
+        print(f"   Numbers: {claim.has_numbers}, Dates: {claim.has_dates}")
+        print()
 
-        claims = verifier.decompose(answer)
+    # Test verification
+    context = [
+        "Apple Inc. reported revenue of $383.29 billion for fiscal year 2024.",
+        "Gross margin was 44.1% compared to 44.9% in fiscal 2023.",
+        "As a public company, Apple files annual 10-K reports with the SEC."
+    ]
 
-        print(f"Decomposed into {len(claims)} claims:\n")
-        for i, claim in enumerate(claims):
-            print(f"{i+1}. [{claim.claim_type.value}] {claim.text}")
-            print(f"   Numbers: {claim.has_numbers}, Dates: {claim.has_dates}")
-            print()
+    verified_claims = verifier.verify(claims, context)
 
-        # Test verification
-        context = [
-            "Apple Inc. reported revenue of $383.29 billion for fiscal year 2024.",
-            "Gross margin was 44.1% compared to 44.9% in fiscal 2023.",
-            "As a public company, Apple files annual 10-K reports with the SEC."
-        ]
-
-        verified_claims = verifier.verify(claims, context)
-
-        print("\nVerification results:\n")
-        for claim in verified_claims:
-            status = "✓" if claim.verified else "✗"
-            print(f"{status} {claim.text}")
-            print(f"  Method: {claim.verification_method}")
-            print(f"  Evidence: {claim.supporting_evidence}")
-            print()
+    print("\nVerification results:\n")
+    for claim in verified_claims:
+        status = "✓" if claim.verified else "✗"
+        print(f"{status} {claim.text}")
+        print(f"  Method: {claim.verification_method}")
+        print(f"  Evidence: {claim.supporting_evidence}")
+        print()

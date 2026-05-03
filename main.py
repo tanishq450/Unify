@@ -24,7 +24,6 @@ import os
 import loguru
 
 from Model_loader.llm import ModelLoader
-from Model_loader.embedding_model import RawOpenAIClient
 from implementations.intent_classifier import IntentClassifier, RAGStrategy
 from implementations.Rag import Rag_pipeline
 from implementations.Graph_rag import GRAPH_RAG
@@ -60,10 +59,6 @@ class FinanceRAGOrchestrator:
         # --- Core components ---
         self.model_loader = ModelLoader()
         self.model_loader.load_models()
-        self.model_loader.set_settings()
-
-        # --- Raw OpenAI client (for hallucination verifier LLM calls) ---
-        self.raw_llm = RawOpenAIClient()
 
         # --- Intent classification ---
         self.classifier = IntentClassifier()
@@ -78,8 +73,11 @@ class FinanceRAGOrchestrator:
         # Table-aware RAG — optional, loaded on demand
         self.table_rag = None
 
-        # --- Hallucination verifier (with real LLM) ---
-        self.verifier = FinGroundVerifier(llm_client=self.raw_llm)
+        # --- Hallucination verifier ---
+        self.verifier = FinGroundVerifier(
+            llm_client=self.model_loader,
+            embedding_model=self.model_loader
+        )
 
         logger.info("Orchestrator ready ✓")
 
@@ -92,7 +90,14 @@ class FinanceRAGOrchestrator:
         try:
             self.graph_rag = GRAPH_RAG()
             # Graph RAG needs a LangChain-compatible LLM
-            langchain_llm = ModelLoader.get_langchain_llm()
+            from langchain_openai import ChatOpenAI
+            import os
+            langchain_llm = ChatOpenAI(
+                model="anthropic/claude-opus-4.1",
+                temperature=0.1,
+                openai_api_base=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
+                openai_api_key=os.getenv("MESH_API_KEY", "rsk_01KQMA836XVPYT6HX34QDX8KPG"),
+            )
             self.graph_rag.load_llm(langchain_llm)
             logger.info("Graph RAG connected ✓")
         except Exception as e:
@@ -298,8 +303,11 @@ Question:
 Answer clearly and concisely:"""
 
         try:
-            response = self.model_loader.llm.complete(prompt)
-            return str(response)
+            messages = [
+                {"role": "system", "content": "You are a helpful financial analyst AI assistant. Answer only from the provided context. If context is insufficient, say so. Cite specific numbers and dates."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer clearly and concisely:"},
+            ]
+            return self.model_loader.chat(messages)
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
             return ""

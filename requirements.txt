@@ -28,6 +28,7 @@ chonkie
 # ── LLM APIs ────────────────────────────────────────────────────────
 openai
 anthropic
+ollama
 
 # ── Data Validation & Structuring ───────────────────────────────────
 pydantic

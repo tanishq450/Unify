@@ -1,14 +1,17 @@
-from llama_index.readers.file import PDFReader
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 import fitz
 import os
 import loguru
 from chonkie import TokenChunker
-from llama_index.core import Document
+from dataclasses import dataclass
 from pathlib import Path
-from llama_index.core import load_index_from_storage
-import loguru
 from Model_loader.llm import ModelLoader
+
+
+@dataclass
+class Document:
+    """Minimal document container (replaces llama_index.core.Document)."""
+    text: str
+    metadata: dict = None
 
 
 
@@ -143,7 +146,13 @@ async def unified_ingest(file_path: str, collection_name: str):
             graph_rag = GRAPH_RAG()
             
             # Use LangChain-compatible LLM (required by LLMGraphTransformer)
-            langchain_llm = ModelLoader.get_langchain_llm()
+            from langchain_openai import ChatOpenAI
+            langchain_llm = ChatOpenAI(
+                model="anthropic/claude-opus-4.1",
+                temperature=0.1,
+                openai_api_base=os.getenv("MESH_API_BASE", "https://api.meshapi.ai/v1"),
+                openai_api_key=os.getenv("MESH_API_KEY", "rsk_01KQMA836XVPYT6HX34QDX8KPG"),
+            )
             graph_rag.load_llm(langchain_llm)
             
             # Convert and make graph

@@ -82,6 +82,11 @@ class HybridRetriever:
 
         logger.info("HybridRetriever initialized ✓")
 
+    def _embed(self, text: str) -> list[float]:
+        """Return a single dense embedding vector (fastembed API)."""
+        vec = next(iter(self.embed_model.embed([text])))
+        return vec.tolist() if hasattr(vec, "tolist") else list(vec)
+
     # ------------------------------------------------------------------
     # Core search
     # ------------------------------------------------------------------
@@ -110,9 +115,7 @@ class HybridRetriever:
             List of SearchResult ranked by relevance
         """
         # 1. Embed query (dense + sparse)
-        query_dense = self.embed_model.get_text_embedding(query)
-        if hasattr(query_dense, "tolist"):
-            query_dense = query_dense.tolist()
+        query_dense = self._embed(query)
 
         sparse_obj = list(self.sparse_model.embed([query]))[0]
         query_sparse = {
@@ -216,9 +219,9 @@ class HybridRetriever:
             return results
 
         # Embed query and results for similarity computation
-        query_emb = np.array(self.embed_model.get_text_embedding(query))
+        query_emb = np.array(self._embed(query))
         result_embs = np.array([
-            self.embed_model.get_text_embedding(r.text) for r in results
+            self._embed(r.text) for r in results
         ])
 
         # Normalize
@@ -281,9 +284,7 @@ class FinanceHybridRetriever(HybridRetriever):
             )
         """
         # Embed query
-        query_dense = self.embed_model.get_text_embedding(query)
-        if hasattr(query_dense, "tolist"):
-            query_dense = query_dense.tolist()
+        query_dense = self._embed(query)
 
         sparse_obj = list(self.sparse_model.embed([query]))[0]
         query_sparse = {

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unify-finance-rag"
+version = "0.1.0"
+description = "Multi-strategy Finance RAG with Intent Classification and Hallucination Verification"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "llama-index",
+    "llama-index-core",
+    "llama-index-llms-openai",
+    "llama-index-embeddings-openai",
+    "llama-index-readers-file",
+    "langchain-openai",
+    "langchain-core",
+    "langchain-neo4j",
+    "langchain-experimental",
+    "sentence-transformers",
+    "qdrant-client",
+    "fastembed",
+    "numpy",
+    "tqdm",
+    "pdfplumber",
+    "PyMuPDF",
+    "Pillow",
+    "llama-parse",
+    "chonkie",
+    "openai",
+    "anthropic",
+    "ollama",
+    "pydantic",
+    "pandas",
+    "loguru",
+    "fastapi",
+    "uvicorn",
+    "python-multipart"
+]
+
+[tool.setuptools]
+packages = ["qdrant", "implementations", "utils", "Model_loader"]
+py-modules = ["main", "api", "evaluation"]

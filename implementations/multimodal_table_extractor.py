@@ -71,7 +71,7 @@ class LlamaParseExtractor:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("LLAMA_CLOUD_API_KEY")
+        self.api_key = api_key or os.getenv("LLAMA_API_KEY")
 
         if not self.api_key:
             raise ValueError(
@@ -395,8 +395,10 @@ class VisionModelExtractor:
         self.model = model
 
         if model.startswith("gpt"):
-            from Model_loader.embedding_model import RawOpenAIClient
-            self.client = RawOpenAIClient().client
+            from Model_loader.llm import ModelLoader
+            loader = ModelLoader()
+            loader.load_models()
+            self.client = loader.client
         elif model.startswith("claude"):
             self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
             if not self.api_key:
@@ -681,7 +683,7 @@ class UnifiedTableExtractor:
             prefer_local: If True, use pdfplumber even if API keys available
         """
 
-        self.llama_parse_key = llama_parse_key or os.getenv("LLAMA_CLOUD_API_KEY")
+        self.llama_parse_key = llama_parse_key or os.getenv("LLAMA_API_KEY")
         self.openai_key = openai_key or os.getenv("OPENAI_API_KEY") or os.getenv("MESH_API_KEY")
         self.anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY")
         self.prefer_local = prefer_local

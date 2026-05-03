@@ -12,27 +12,7 @@ from qdrant_client.models import (
 
 import os
 
-from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.core import StorageContext
-
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-
-
-# ---------------- SIMPLE (LlamaIndex) ----------------
-def get_qdrant_vector_store(collection_name: str):
-
-    client = QdrantClient(url=QDRANT_URL)
-
-    vector_store = QdrantVectorStore(
-        client=client,
-        collection_name=collection_name,
-    )
-
-    storage_context = StorageContext.from_defaults(
-        vector_store=vector_store
-    )
-
-    return storage_context
 
 
 # ---------------- HYBRID CLIENT ----------------

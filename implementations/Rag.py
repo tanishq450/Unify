@@ -10,13 +10,12 @@ from fastembed import SparseTextEmbedding
 from implementations.hybrid_retriever import HybridRetriever
 
 
-# Initialize sparse model globally to avoid reloading
-sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+# Sparse BM25 model (local, no API needed)
+_sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
 def compute_sparse_vectors(texts: list[str]):
     """Compute sparse vectors (BM25) using fastembed"""
-    embeddings = list(sparse_model.embed(texts))
-    return embeddings
+    return list(_sparse_model.embed(texts))
 
 
 class Rag_pipeline:
@@ -26,7 +25,6 @@ class Rag_pipeline:
         # Core components
         self.model_loader = ModelLoader()
         self.model_loader.load_models()
-        self.model_loader.set_settings()
 
         self.docloader = Docloader()
         self.chunker = chunking()
@@ -35,8 +33,9 @@ class Rag_pipeline:
         self.qdrant = QdrantHybridClient()
 
         # Hybrid retriever (for search — reranking + MMR)
+        # Pass model_loader directly — it exposes .embed() used by HybridRetriever
         self.retriever = HybridRetriever(
-            embed_model=self.model_loader.embed_model,
+            embed_model=self.model_loader,
         )
 
     # ---------------- PREP ----------------
@@ -54,7 +53,8 @@ class Rag_pipeline:
     def _embed_documents(self, documents):
         texts = [doc.text for doc in documents]
 
-        dense = self.model_loader.embed_model.get_text_embedding_batch(texts)
+        # Dense via MeshAPI (model_loader.embed), sparse via fastembed BM25
+        dense = self.model_loader.embed(texts)
         sparse = compute_sparse_vectors(texts)
 
         return texts, dense, sparse
@@ -147,23 +147,12 @@ class Rag_pipeline:
             context = "\n\n".join([n["text"] for n in top_k_nodes])
 
             # 4. LLM synthesis
-            prompt = f"""
-            You are a helpful AI assistant.
+            messages = [
+                {"role": "system", "content": "You are a helpful AI assistant. Answer only from the provided context."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer clearly and concisely:"},
+            ]
 
-            Answer the question based ONLY on the context below.
-
-            Context:
-            {context}
-
-            Question:
-            {query}
-
-            Answer clearly and concisely:
-            """
-
-            response = self.model_loader.llm.complete(prompt)
-
-            answer = str(response)
+            answer = self.model_loader.chat(messages)
 
             score = search_results[0].score if search_results else 0.0
 
