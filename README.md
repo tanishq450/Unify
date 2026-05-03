@@ -88,5 +88,4 @@ Create a file named `.env` and add your API keys (see `.env.example`). You will 
 
 ---
 
-## 📄 License
-MIT License. Created for the Hackathon by the Unify Team.
+
