@@ -37,6 +37,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-multipart"
+    "json-repair"
 ]
 
 [tool.setuptools]
