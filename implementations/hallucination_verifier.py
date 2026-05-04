@@ -5,6 +5,7 @@ import re
 import json
 import numpy as np
 from pydantic import BaseModel
+from Model_loader import ModelLoader
 
 
 class ClaimType(str, Enum):
@@ -90,8 +91,12 @@ class FinGroundVerifier:
             embedding_model: For semantic evidence matching
         """
 
-        self.llm = llm_client
-        self.embedding_model = embedding_model
+        if llm_client is None or embedding_model is None:
+            default_loader = ModelLoader()
+            default_loader.load_models()
+
+        self.llm = llm_client or default_loader
+        self.embedding_model = embedding_model or default_loader
 
         # Verification thresholds
         self.exact_match_threshold = 0.01  # 1% for exact match
