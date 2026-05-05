@@ -41,4 +41,5 @@ loguru
 fastapi
 uvicorn
 python-multipart
-python-dotenv
+python-
+google-genai
